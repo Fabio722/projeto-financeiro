@@ -1,11 +1,14 @@
+import os
 import telebot
 from telebot import types
+from dotenv import load_dotenv
 import database  # Isso importa o seu arquivo database.py
 
-TOKEN = "8831441335:AAHc1KQW68KnaF2KhjWMjrn4RhUSTPSnSbE"
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 bot = telebot.TeleBot(TOKEN)
 
-# Dicionário para guardar o estado do usuário (quem está registrando o quê)
+# Dicionário para Guardar o estado do usuário (quem está registrando o quê)
 user_states = {}
 
 def menu_principal():
