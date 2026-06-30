@@ -1,69 +1,52 @@
-from datetime import datetime, date
+import os
+import psycopg2
+from dotenv import load_dotenv
 
-# Import psycopg2 lazily inside conectar() to avoid import-time errors in editors
-# that don't have the package installed.
-
-# URL de conexão com o banco de dados
-DB_URL = "postgresql://postgres:A1980F2350pq@db.pmargckbnntqnjcjigxu.supabase.co:5432/postgres"
-
+load_dotenv()
 
 def conectar():
-    try:
-        import importlib
-        psycopg2 = importlib.import_module("psycopg2")
-    except ModuleNotFoundError:
-        raise ImportError("psycopg2 is required but not installed. Install with: pip install psycopg2-binary")
-    return psycopg2.connect(DB_URL)
-
+    db_url = os.getenv("DB_URL")
+    if not db_url:
+        raise ValueError("ERRO: DB_URL não configurada no ambiente.")
+    return psycopg2.connect(db_url)
 
 def init_db():
+    """Inicializa todas as tabelas necessárias para o seu bot financeiro."""
     conn = conectar()
     cursor = conn.cursor()
-    # Criar a tabela de movimentacoes
-    cursor.execute("""
-                   CREATE TABLE IF NOT EXISTS movimentacoes (
-                       id SERIAL PRIMARY KEY,
-                       tipo VARCHAR(10),   -- 'ganho' ou 'gasto'
-                       categoria VARCHAR(50),  -- 'Emprego', 'Moto 99', 'Boletos', 'Investimentos', 'Dia a Dia', etc.
-                       valor NUMERIC(10, 2),
-                       descricao TEXT,
-                       data DATE             -- Salva a data correta
-                   )
-                   """)
+    
+    # 1. Tabela de Categorias (ex: Alimentação, Transporte, Salário)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS categorias (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(50) UNIQUE NOT NULL,
+            tipo VARCHAR(10) NOT NULL -- 'ganho' ou 'gasto'
+        )
+    ''')
+    
+    # 2. Tabela de Movimentações
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS movimentacoes (
+            id SERIAL PRIMARY KEY,
+            categoria_id INTEGER REFERENCES categorias(id),
+            valor REAL NOT NULL,
+            descricao TEXT,
+            data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     cursor.close()
     conn.close()
+    print("Tabelas configuradas com sucesso!")
 
-
-def registrar_fluxo(tipo, categoria, valor, descricao, data=None):
-    """Registra um fluxo de caixa. Se data for None, usa a data atual."""
+def inserir_movimentacao(categoria_id, valor, descricao):
     conn = conectar()
     cursor = conn.cursor()
-
-    if data is None:
-        data = date.today()
-    elif isinstance(data, str):
-        # tenta converter string YYYY-MM-DD
-        data = datetime.fromisoformat(data).date()
-
-    cursor.execute("""
-                   INSERT INTO movimentacoes (tipo, categoria, valor, descricao, data)
-                   VALUES (%s, %s, %s, %s, %s)
-                   """, (tipo, categoria, valor, descricao, data))
+    cursor.execute(
+        "INSERT INTO movimentacoes (categoria_id, valor, descricao) VALUES (%s, %s, %s)",
+        (categoria_id, valor, descricao)
+    )
     conn.commit()
     cursor.close()
     conn.close()
-
-
-# Garantir criação da tabela ao importar o módulo
-init_db()
-
-def buscar_resumo_hoje():
-    conn = conectar()
-    cursor = conn.cursor()
-    # Buscar todas as movimentacoes de hoje
-    cursor.execute("SELECT tipo, categoria, valor, descricao FROM movimentacoes Where data = CURRENT_DATE")
-    resultados = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return resultados
