@@ -1,8 +1,23 @@
 import os
 import telebot
 from telebot import types
-from dotenv import load_dotenv
+from pathlib import Path
 import database
+
+
+def load_dotenv():
+    env_path = Path('.') / '.env'
+    if not env_path.is_file():
+        return
+    with env_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 load_dotenv()
 bot = telebot.TeleBot(os.getenv("TELEGRAM_TOKEN"))
